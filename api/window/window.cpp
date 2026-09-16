@@ -332,17 +332,6 @@ bool __loadSavedWindowProps() {
         windowProps.maximize = options["maximize"].get<bool>();
         windowProps.sizeOptions.width = options["width"].get<int>();
         windowProps.sizeOptions.height = options["height"].get<int>();
-
-        #if defined(_WIN32)
-        WINDOWPLACEMENT wp = {sizeof(WINDOWPLACEMENT)};
-        wp.rcNormalPosition.left = windowProps.x;
-        wp.rcNormalPosition.top = windowProps.y;
-        wp.rcNormalPosition.right = windowProps.x + windowProps.sizeOptions.width;
-        wp.rcNormalPosition.bottom = windowProps.y + windowProps.sizeOptions.height;
-        wp.showCmd = SW_SHOWNORMAL;
-
-        SetWindowPlacement(windowHandle, &wp);
-        #endif
     }
     catch(const exception& e) {
         debug::log(debug::LogTypeError, errors::makeErrorMsg(errors::NE_CF_UNBLWCF, string(NEU_WIN_CONFIG_FILE)));
@@ -707,8 +696,10 @@ bool __createWindow() {
 		__undoFakeHidden();
     #endif
 
+    #if !defined(_WIN32)
     if(windowProps.maximize)
         window::maximize();
+    #endif
 
     if(windowProps.fullScreen)
         window::setFullScreen();
@@ -724,6 +715,23 @@ bool __createWindow() {
 
     if(windowProps.skipTaskbar)
         window::setSkipTaskbar(true);
+
+    #if defined(_WIN32)
+    if(savedState) {
+        WINDOWPLACEMENT wp = {sizeof(WINDOWPLACEMENT)};
+        wp.rcNormalPosition.left = windowProps.x;
+        wp.rcNormalPosition.top = windowProps.y;
+        wp.rcNormalPosition.right = windowProps.x + windowProps.sizeOptions.width;
+        wp.rcNormalPosition.bottom = windowProps.y + windowProps.sizeOptions.height;
+        wp.showCmd = windowProps.maximize ? SW_MAXIMIZE : SW_SHOWNORMAL;
+        SetWindowPlacement(windowHandle, &wp);
+    }
+    if(!windowProps.hidden) {
+        ShowWindow(windowHandle, windowProps.maximize ? SW_MAXIMIZE : SW_SHOWNORMAL);
+        UpdateWindow(windowHandle);
+        SetForegroundWindow(windowHandle);
+    }
+    #endif
 
     nativeWindow->navigate(windowProps.url);
 

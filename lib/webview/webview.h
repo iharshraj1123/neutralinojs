@@ -1256,6 +1256,7 @@ public:
       wc.lpszClassName = L"Neutralinojs_webview";
       wc.hIcon = icon;
       wc.hIconSm = icon;
+      wc.hbrBackground = CreateSolidBrush(RGB(24, 24, 24));
       wc.lpfnWndProc =
           (WNDPROC)(+[](HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) -> int {
             auto w = (win32_edge_engine *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
@@ -1400,13 +1401,13 @@ public:
       SetWindowLong(m_window, GWL_EXSTYLE, GetWindowLong(m_window, GWL_EXSTYLE) | WS_EX_LAYERED);
       // transparent white, use of environment variable prevents flashing on show
       SetEnvironmentVariable(L"WEBVIEW2_DEFAULT_BACKGROUND_COLOR", L"00FFFFFF");
+    } else {
+      // dark background prevents white flash on show
+      SetEnvironmentVariable(L"WEBVIEW2_DEFAULT_BACKGROUND_COLOR", L"FF181818");
     }
 
     // stop the taskbar icon from showing by removing WS_EX_APPWINDOW.
     SetWindowLong(m_window, GWL_EXSTYLE, GetWindowLong(m_window, GWL_EXSTYLE) & ~WS_EX_APPWINDOW);
-    ShowWindow(m_window, SW_SHOW);
-    UpdateWindow(m_window);
-    SetForegroundWindow(m_window);
 
     // store the original initial window style
     m_originalStyleEx = GetWindowLong(m_window, GWL_EXSTYLE);
