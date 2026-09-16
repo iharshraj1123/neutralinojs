@@ -236,7 +236,11 @@ void __undoFakeHidden() {
 	SetWindowLong(windowHandle, GWL_EXSTYLE, nativeWindow->m_originalStyleEx);
 	SetWindowPos(windowHandle, nullptr,
         x, y, 0, 0, SWP_NOZORDER | SWP_NOSIZE);
-	ShowWindow(windowHandle, SW_SHOW);
+    if(windowProps.maximize) {
+        ShowWindow(windowHandle, SW_MAXIMIZE);
+    } else {
+        ShowWindow(windowHandle, SW_SHOW);
+    }
 }
 
 bool __getEncoderClsid(const WCHAR *format, CLSID *pClsid) {
@@ -691,6 +695,9 @@ bool __createWindow() {
     if(windowProps.hidden)
         window::hide();
 
+    if(windowProps.borderless)
+        window::setBorderless(true);
+
     #if defined(_WIN32)
     if (!windowProps.hidden && __isFakeHidden())
 		__undoFakeHidden();
@@ -710,9 +717,6 @@ bool __createWindow() {
     if(windowProps.alwaysOnTop)
         window::setAlwaysOnTop(true);
 
-    if(windowProps.borderless)
-        window::setBorderless(true);
-
     if(windowProps.skipTaskbar)
         window::setSkipTaskbar(true);
 
@@ -725,11 +729,6 @@ bool __createWindow() {
         wp.rcNormalPosition.bottom = windowProps.y + windowProps.sizeOptions.height;
         wp.showCmd = windowProps.maximize ? SW_MAXIMIZE : SW_SHOWNORMAL;
         SetWindowPlacement(windowHandle, &wp);
-    }
-    if(!windowProps.hidden) {
-        ShowWindow(windowHandle, windowProps.maximize ? SW_MAXIMIZE : SW_SHOWNORMAL);
-        UpdateWindow(windowHandle);
-        SetForegroundWindow(windowHandle);
     }
     #endif
 

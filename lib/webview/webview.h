@@ -1363,6 +1363,12 @@ public:
               }
               return DefWindowProc(hwnd, msg, wp, lp);
             }
+            case WM_NCHITTEST: {
+              if (w != nullptr && w->m_borderless) {
+                return HTCLIENT;
+              }
+              return DefWindowProc(hwnd, msg, wp, lp);
+            }
             case WM_GETMINMAXINFO: {
               auto lpmmi = (LPMINMAXINFO)lp;
               if (w == nullptr) {
@@ -1408,6 +1414,9 @@ public:
 
     // stop the taskbar icon from showing by removing WS_EX_APPWINDOW.
     SetWindowLong(m_window, GWL_EXSTYLE, GetWindowLong(m_window, GWL_EXSTYLE) & ~WS_EX_APPWINDOW);
+    ShowWindow(m_window, SW_SHOW);
+    UpdateWindow(m_window);
+    SetForegroundWindow(m_window);
 
     // store the original initial window style
     m_originalStyleEx = GetWindowLong(m_window, GWL_EXSTYLE);
