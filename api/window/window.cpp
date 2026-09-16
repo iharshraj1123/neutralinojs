@@ -1221,12 +1221,9 @@ void setBorderless(bool borderless) {
     ((void (*)(id, SEL, int))objc_msgSend)((id) windowHandle,
             "setStyleMask:"_sel, windowStyleMask);
     #elif defined(_WIN32)
-    DWORD currentStyle = GetWindowLong(windowHandle, GWL_STYLE);
-    currentStyle = borderless ? (currentStyle & ~(WS_CAPTION | WS_THICKFRAME)) : 
-                    (currentStyle | (WS_CAPTION | WS_THICKFRAME));
-    SetWindowLong(windowHandle, GWL_STYLE, currentStyle);
-    SetWindowPos(windowHandle, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE |
-                    SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    if(nativeWindow) {
+        nativeWindow->setBorderless(borderless);
+    }
     #endif
 }
 

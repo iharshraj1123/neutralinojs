@@ -1,0 +1,27 @@
+name: Build Patched Neutralino Windows Binary
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build
+        shell: cmd
+        run: |
+          mkdir build
+          cmake -DCMAKE_BUILD_TYPE=Release . -G "Ninja" -B build
+          ninja -C build -j %NUMBER_OF_PROCESSORS%
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitero-win_x64
+          path: bin/neutralino-win_x64.exe

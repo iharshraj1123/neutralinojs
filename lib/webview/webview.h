@@ -1344,6 +1344,24 @@ public:
               }
               break;
             // ---- /End Tray lib related --------
+            case WM_NCCALCSIZE: {
+              if (w != nullptr && w->m_borderless) {
+                if (wp == TRUE) {
+                  WINDOWPLACEMENT placement = { sizeof(WINDOWPLACEMENT) };
+                  GetWindowPlacement(hwnd, &placement);
+                  if (placement.showCmd == SW_MAXIMIZE) {
+                    HMONITOR hmon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+                    MONITORINFO mi = { sizeof(MONITORINFO) };
+                    GetMonitorInfo(hmon, &mi);
+                    auto &params = *reinterpret_cast<NCCALCSIZE_PARAMS *>(lp);
+                    params.rgrc[0] = mi.rcWork;
+                    return 0;
+                  }
+                  return 0;
+                }
+              }
+              return DefWindowProc(hwnd, msg, wp, lp);
+            }
             case WM_GETMINMAXINFO: {
               auto lpmmi = (LPMINMAXINFO)lp;
               if (w == nullptr) {
@@ -1508,6 +1526,24 @@ public:
   void init(const std::string js) { m_browser->init(js); }
   void extend_user_agent(const std::string customAgent) { m_browser->extend_user_agent(customAgent); }
 
+  bool m_borderless = false;
+
+  void setBorderless(bool borderless) {
+    m_borderless = borderless;
+    DWORD currentStyle = GetWindowLong(m_window, GWL_STYLE);
+    if (borderless) {
+      currentStyle |= (WS_THICKFRAME | WS_CAPTION | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
+      SetWindowLong(m_window, GWL_STYLE, currentStyle);
+      MARGINS margins = { 1, 1, 1, 1 };
+      DwmExtendFrameIntoClientArea(m_window, &margins);
+    } else {
+      currentStyle |= (WS_CAPTION | WS_THICKFRAME);
+      SetWindowLong(m_window, GWL_STYLE, currentStyle);
+    }
+    SetWindowPos(m_window, NULL, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+  }
+
   DWORD m_originalStyleEx;
 
 protected:
@@ -1565,6 +1601,12 @@ public:
   int get_init_code() {
     return initCode;
   }
+
+#if defined(_WIN32)
+  void setBorderless(bool borderless) {
+    browser_engine::setBorderless(borderless);
+  }
+#endif
 
 };
 } // namespace webview
