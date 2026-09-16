@@ -1348,16 +1348,6 @@ public:
             case WM_NCCALCSIZE: {
               if (w != nullptr && w->m_borderless) {
                 if (wp == TRUE) {
-                  WINDOWPLACEMENT placement = { sizeof(WINDOWPLACEMENT) };
-                  GetWindowPlacement(hwnd, &placement);
-                  if (placement.showCmd == SW_MAXIMIZE) {
-                    HMONITOR hmon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-                    MONITORINFO mi = { sizeof(MONITORINFO) };
-                    GetMonitorInfo(hmon, &mi);
-                    auto &params = *reinterpret_cast<NCCALCSIZE_PARAMS *>(lp);
-                    params.rgrc[0] = mi.rcWork;
-                    return 0;
-                  }
                   return 0;
                 }
               }
@@ -1371,6 +1361,17 @@ public:
             }
             case WM_GETMINMAXINFO: {
               auto lpmmi = (LPMINMAXINFO)lp;
+              if (w != nullptr && w->m_borderless) {
+                HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+                if (monitor != nullptr) {
+                  MONITORINFO mi = { sizeof(MONITORINFO) };
+                  GetMonitorInfo(monitor, &mi);
+                  lpmmi->ptMaxPosition.x = mi.rcWork.left - mi.rcMonitor.left;
+                  lpmmi->ptMaxPosition.y = mi.rcWork.top - mi.rcMonitor.top;
+                  lpmmi->ptMaxSize.x = mi.rcWork.right - mi.rcWork.left;
+                  lpmmi->ptMaxSize.y = mi.rcWork.bottom - mi.rcWork.top;
+                }
+              }
               if (w == nullptr) {
                 return 0;
               }
@@ -1381,7 +1382,8 @@ public:
               if (w->m_minsz.x > 0 && w->m_minsz.y > 0) {
                 lpmmi->ptMinTrackSize = w->m_minsz;
               }
-            } break;
+              return 0;
+            }
             default:
               if (msg == WM_TASKBAR_CREATED) {
                 tray_recreate();
