@@ -1636,6 +1636,15 @@ public:
       int ncrp = 1; // DWMNCRP_DISABLED: disables native DWM caption button rendering
       DwmSetWindowAttribute(m_window, 2, &ncrp, sizeof(ncrp));
 
+      #ifndef DWMWA_WINDOW_CORNER_PREFERENCE
+      #define DWMWA_WINDOW_CORNER_PREFERENCE 33
+      #endif
+      #ifndef DWMWCP_ROUND
+      #define DWMWCP_ROUND 2
+      #endif
+      int cornerPref = DWMWCP_ROUND;
+      DwmSetWindowAttribute(m_window, DWMWA_WINDOW_CORNER_PREFERENCE, &cornerPref, sizeof(cornerPref));
+
       MARGINS margins = m_transparent ? MARGINS{ -1, -1, -1, -1 } : MARGINS{ 1, 1, 1, 1 };
       DwmExtendFrameIntoClientArea(m_window, &margins);
     } else {

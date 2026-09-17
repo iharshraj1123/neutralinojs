@@ -138,6 +138,21 @@ inline HRESULT TrySetWindowBackdrop(HWND hWnd, bool enable) {
         ::SetWindowLong(hWnd, GWL_STYLE, currentStyle);
     }
 
+#ifndef DWMWA_WINDOW_CORNER_PREFERENCE
+#define DWMWA_WINDOW_CORNER_PREFERENCE 33
+#endif
+
+#ifndef DWMWCP_ROUND
+#define DWMWCP_ROUND 2
+#endif
+
+    // 4. On Windows 11 (Build >= 22000), explicitly enforce native rounded corners
+    // so DWM clips the window, drop shadow, and backdrop with native smooth curves.
+    if (build >= 22000) {
+        int cornerPref = DWMWCP_ROUND;
+        DwmSetWindowAttribute(hWnd, DWMWA_WINDOW_CORNER_PREFERENCE, &cornerPref, sizeof(cornerPref));
+    }
+
     if (build >= 22621) {
         MARGINS margins = {-1, -1, -1, -1};
         DwmExtendFrameIntoClientArea(hWnd, &margins);
