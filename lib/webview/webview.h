@@ -1469,6 +1469,9 @@ public:
     // set dark mode of title bar according to system theme
     TrySetWindowTheme(m_window);
 
+    // enable native Windows DWM Acrylic backdrop blur behind the window
+    TrySetWindowBackdrop(m_window, transparent);
+
     if (!m_browser->embed(m_window, debug, openInspector, emitDropEvents, transparent)) {
       initCode = 1;
     }
@@ -1587,13 +1590,20 @@ public:
     m_borderless = borderless;
     DWORD currentStyle = GetWindowLong(m_window, GWL_STYLE);
     if (borderless) {
-      currentStyle |= (WS_THICKFRAME | WS_CAPTION | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
+      currentStyle |= (WS_THICKFRAME | WS_CAPTION);
+      currentStyle &= ~(WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
       SetWindowLong(m_window, GWL_STYLE, currentStyle);
+
+      int ncrp = 1; // DWMNCRP_DISABLED: disables native DWM caption button rendering
+      DwmSetWindowAttribute(m_window, 2, &ncrp, sizeof(ncrp));
+
       MARGINS margins = { 1, 1, 1, 1 };
       DwmExtendFrameIntoClientArea(m_window, &margins);
     } else {
-      currentStyle |= (WS_CAPTION | WS_THICKFRAME);
+      currentStyle |= (WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
       SetWindowLong(m_window, GWL_STYLE, currentStyle);
+      int ncrp = 0; // DWMNCRP_USEWINDOWSTYLE
+      DwmSetWindowAttribute(m_window, 2, &ncrp, sizeof(ncrp));
     }
     SetWindowPos(m_window, NULL, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);

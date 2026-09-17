@@ -1808,6 +1808,18 @@ json print(const json &input) {
     return output;
 }
 
+json setBackdrop(const json &input) {
+    json output;
+    #if defined(_WIN32)
+    bool enabled = true;
+    if(helpers::hasField(input, "enabled")) {
+        enabled = input["enabled"].get<bool>();
+    }
+    TrySetWindowBackdrop(windowHandle, enabled);
+    #endif
+    output["success"] = true;
+    return output;
+}
 
 } // namespace controllers
 

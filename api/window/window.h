@@ -173,6 +173,7 @@ json snapshot(const json &input);
 json setMainMenu(const json &input);
 json beginDrag(const json& input);
 json print(const json &input);
+json setBackdrop(const json &input);
 
 } // namespace controllers
 
