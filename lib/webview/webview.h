@@ -1376,12 +1376,16 @@ public:
                   if (monitor != nullptr) {
                     MONITORINFO mi = { sizeof(MONITORINFO) };
                     if (GetMonitorInfo(monitor, &mi)) {
+                      RECT work = mi.rcWork;
+                      if (EqualRect(&mi.rcWork, &mi.rcMonitor)) {
+                        work.bottom -= 1;
+                      }
                       if (wp == TRUE) {
                         auto params = (NCCALCSIZE_PARAMS *)lp;
-                        params->rgrc[0] = mi.rcWork;
+                        params->rgrc[0] = work;
                       } else {
                         auto rc = (RECT *)lp;
-                        *rc = mi.rcWork;
+                        *rc = work;
                       }
                     }
                   }
@@ -1403,10 +1407,14 @@ public:
                 if (monitor != nullptr) {
                   MONITORINFO mi = { sizeof(MONITORINFO) };
                   GetMonitorInfo(monitor, &mi);
-                  lpmmi->ptMaxPosition.x = mi.rcWork.left - mi.rcMonitor.left;
-                  lpmmi->ptMaxPosition.y = mi.rcWork.top - mi.rcMonitor.top;
-                  lpmmi->ptMaxSize.x = mi.rcWork.right - mi.rcWork.left;
-                  lpmmi->ptMaxSize.y = mi.rcWork.bottom - mi.rcWork.top;
+                  RECT work = mi.rcWork;
+                  if (EqualRect(&mi.rcWork, &mi.rcMonitor)) {
+                    work.bottom -= 1;
+                  }
+                  lpmmi->ptMaxPosition.x = work.left - mi.rcMonitor.left;
+                  lpmmi->ptMaxPosition.y = work.top - mi.rcMonitor.top;
+                  lpmmi->ptMaxSize.x = work.right - work.left;
+                  lpmmi->ptMaxSize.y = work.bottom - work.top;
                 }
               }
               if (w == nullptr) {
@@ -1455,8 +1463,8 @@ public:
     UpdateWindow(m_window);
     SetForegroundWindow(m_window);
 
-    // store the original initial window style
-    m_originalStyleEx = GetWindowLong(m_window, GWL_EXSTYLE);
+    // store the original initial window style with WS_EX_APPWINDOW preserved for taskbar integration
+    m_originalStyleEx = GetWindowLong(m_window, GWL_EXSTYLE) | WS_EX_APPWINDOW;
 
     // set dark mode of title bar according to system theme
     TrySetWindowTheme(m_window);

@@ -233,7 +233,7 @@ void __undoFakeHidden() {
         y = pos.second;
     }
 	ShowWindow(windowHandle, SW_HIDE);
-	SetWindowLong(windowHandle, GWL_EXSTYLE, nativeWindow->m_originalStyleEx);
+	SetWindowLong(windowHandle, GWL_EXSTYLE, nativeWindow->m_originalStyleEx | WS_EX_APPWINDOW);
 	SetWindowPos(windowHandle, nullptr,
         x, y, 0, 0, SWP_NOZORDER | SWP_NOSIZE);
     if(windowProps.maximize) {
