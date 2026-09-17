@@ -1034,7 +1034,7 @@ class DropTarget : public IDropTarget {
 
 class edge_chromium {
 public:
-  bool embed(HWND wnd, bool debug, bool openInspector, bool emitDropEvents) {
+  bool embed(HWND wnd, bool debug, bool openInspector, bool emitDropEvents, bool transparent = false) {
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     std::atomic_flag flag = ATOMIC_FLAG_INIT;
     flag.test_and_set();
@@ -1070,6 +1070,19 @@ public:
             m_controller = controller;
             m_controller->get_CoreWebView2(&m_webview);
             m_webview->AddRef();
+
+            if (transparent) {
+                ComPtr<ICoreWebView2Controller2> controller2;
+                if (SUCCEEDED(controller->QueryInterface(IID_PPV_ARGS(&controller2)))) {
+                    COREWEBVIEW2_COLOR transparentColor = {0, 255, 255, 255};
+                    controller2->put_DefaultBackgroundColor(transparentColor);
+                }
+            }
+
+            ComPtr<ICoreWebView2Controller3> controller3;
+            if (SUCCEEDED(controller->QueryInterface(IID_PPV_ARGS(&controller3)))) {
+                controller3->put_BoundsMode(COREWEBVIEW2_BOUNDS_MODE_USE_RAW_PIXELS);
+            }
 
             ComPtr<ICoreWebView2Controller4> controller4;
             if(emitDropEvents && SUCCEEDED(controller->QueryInterface(IID_PPV_ARGS(&controller4)))) {
@@ -1239,6 +1252,7 @@ private:
 class win32_edge_engine {
 public:
   win32_edge_engine(bool debug, bool openInspector, void *window, bool transparent, const std::string& args, bool emitDropEvents) {
+    setDpi();
     if(args != "") {
         std::wstring wargs = str2wstr(args);
         SetEnvironmentVariableW(L"WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", wargs.c_str());
@@ -1273,6 +1287,16 @@ public:
               else if(wp == SIZE_MAXIMIZED) 
                 windowStateChange(WEBVIEW_WINDOW_MAXIMIZE);
               break;
+            case WM_DPICHANGED: {
+              auto prc = (RECT *)lp;
+              SetWindowPos(hwnd, nullptr, prc->left, prc->top,
+                           prc->right - prc->left, prc->bottom - prc->top,
+                           SWP_NOZORDER | SWP_NOACTIVATE);
+              if (w != nullptr && w->m_browser != nullptr) {
+                w->m_browser->resize(hwnd);
+              }
+              return 0;
+            }
             case WM_CLOSE:
               if(windowStateChange)
                 windowStateChange(WEBVIEW_WINDOW_CLOSE);
@@ -1403,8 +1427,6 @@ public:
       m_window = *(static_cast<HWND *>(window));
     }
 
-    setDpi();
-
     if (transparent) {
       SetWindowLong(m_window, GWL_EXSTYLE, GetWindowLong(m_window, GWL_EXSTYLE) | WS_EX_LAYERED);
       // transparent white, use of environment variable prevents flashing on show
@@ -1426,7 +1448,7 @@ public:
     // set dark mode of title bar according to system theme
     TrySetWindowTheme(m_window);
 
-    if (!m_browser->embed(m_window, debug, openInspector, emitDropEvents)) {
+    if (!m_browser->embed(m_window, debug, openInspector, emitDropEvents, transparent)) {
       initCode = 1;
     }
 
@@ -1565,11 +1587,27 @@ private:
 
   void setDpi() {
     HMODULE user32 = LoadLibraryA("User32.dll");
-    auto func_win10 = reinterpret_cast<decltype(&SetProcessDpiAwarenessContext)>(
-      GetProcAddress(user32, "SetProcessDpiAwarenessContext"));
-    if (func_win10) {
-        // Windows 10+
-        func_win10(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
+    if (user32) {
+        typedef BOOL (WINAPI *SetProcessDpiAwarenessContextProc)(DPI_AWARENESS_CONTEXT);
+        typedef DPI_AWARENESS_CONTEXT (WINAPI *SetThreadDpiAwarenessContextProc)(DPI_AWARENESS_CONTEXT);
+
+        auto func_process = reinterpret_cast<SetProcessDpiAwarenessContextProc>(
+            GetProcAddress(user32, "SetProcessDpiAwarenessContext"));
+        if (func_process) {
+            #ifndef DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+            #define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((DPI_AWARENESS_CONTEXT)-4)
+            #endif
+            func_process(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        }
+
+        auto func_thread = reinterpret_cast<SetThreadDpiAwarenessContextProc>(
+            GetProcAddress(user32, "SetThreadDpiAwarenessContext"));
+        if (func_thread) {
+            #ifndef DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+            #define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((DPI_AWARENESS_CONTEXT)-4)
+            #endif
+            func_thread(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        }
     }
   }
 

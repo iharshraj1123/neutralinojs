@@ -199,6 +199,37 @@ void __initExtra() {
 }
 
 #if defined(_WIN32)
+#ifndef DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+#define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((DPI_AWARENESS_CONTEXT)-4)
+#endif
+
+void __initDpiAwareness() {
+    HMODULE user32 = LoadLibraryA("user32.dll");
+    if (user32) {
+        typedef BOOL (WINAPI *SetProcessDpiAwarenessContextProc)(DPI_AWARENESS_CONTEXT);
+        typedef DPI_AWARENESS_CONTEXT (WINAPI *SetThreadDpiAwarenessContextProc)(DPI_AWARENESS_CONTEXT);
+
+        auto pSetProcessDpiAwarenessContext = (SetProcessDpiAwarenessContextProc)GetProcAddress(user32, "SetProcessDpiAwarenessContext");
+        if (pSetProcessDpiAwarenessContext) {
+            pSetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        } else {
+            typedef HRESULT (WINAPI *SetProcessDpiAwarenessProc)(int);
+            HMODULE shcore = LoadLibraryA("shcore.dll");
+            if (shcore) {
+                auto pSetProcessDpiAwareness = (SetProcessDpiAwarenessProc)GetProcAddress(shcore, "SetProcessDpiAwareness");
+                if (pSetProcessDpiAwareness) {
+                    pSetProcessDpiAwareness(2); // PROCESS_PER_MONITOR_DPI_AWARE
+                }
+            }
+        }
+
+        auto pSetThreadDpiAwarenessContext = (SetThreadDpiAwarenessContextProc)GetProcAddress(user32, "SetThreadDpiAwarenessContext");
+        if (pSetThreadDpiAwarenessContext) {
+            pSetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        }
+    }
+}
+
 void __attachConsole() {
     FILE* fp;
     if(AttachConsole(ATTACH_PARENT_PROCESS)) {
@@ -227,6 +258,7 @@ int main(int argc, char ** argv)
         args.push_back(CONVWCSTR(ARG_V[i]));
     }
     #if defined(_WIN32)
+    __initDpiAwareness();
     __attachConsole();
     #endif
     __initFramework(args);

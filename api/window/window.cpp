@@ -268,6 +268,17 @@ bool __getEncoderClsid(const WCHAR *format, CLSID *pClsid) {
 
 double __getScaleFactor() {
 	#if defined(_WIN32)
+    if (windowHandle) {
+        typedef UINT (WINAPI *GetDpiForWindowProc)(HWND);
+        HMODULE user32 = GetModuleHandleA("user32.dll");
+        if (user32) {
+            auto pGetDpiForWindow = (GetDpiForWindowProc)GetProcAddress(user32, "GetDpiForWindow");
+            if (pGetDpiForWindow) {
+                UINT dpi = pGetDpiForWindow(windowHandle);
+                if (dpi > 0) return (double)dpi / 96.0;
+            }
+        }
+    }
     return GetDpiForSystem() / 96.0;
 
 	#elif defined(__APPLE__)
