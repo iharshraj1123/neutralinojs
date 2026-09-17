@@ -1271,7 +1271,7 @@ public:
       wc.lpszClassName = L"Neutralinojs_webview";
       wc.hIcon = icon;
       wc.hIconSm = icon;
-      wc.hbrBackground = transparent ? (HBRUSH)GetStockObject(BLACK_BRUSH) : CreateSolidBrush(RGB(24, 24, 24));
+      wc.hbrBackground = transparent ? nullptr : CreateSolidBrush(RGB(24, 24, 24));
       wc.lpfnWndProc =
           (WNDPROC)(+[](HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) -> int {
             auto w = (win32_edge_engine *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
@@ -1279,7 +1279,13 @@ public:
             static std::vector<HMENU> menuRefs;
             switch (msg) {
             case WM_SIZE:
-              w->m_browser->resize(hwnd);
+              if (w != nullptr && w->m_browser != nullptr) {
+                w->m_browser->resize(hwnd);
+              }
+              if (w != nullptr && (w->m_borderless || w->m_transparent)) {
+                MARGINS margins = w->m_transparent ? MARGINS{ -1, -1, -1, -1 } : MARGINS{ 1, 1, 1, 1 };
+                DwmExtendFrameIntoClientArea(hwnd, &margins);
+              }
               if(!windowStateChange) break;
               if(wp == SIZE_MINIMIZED) 
                 windowStateChange(WEBVIEW_WINDOW_MINIMIZED);
@@ -1288,6 +1294,16 @@ public:
               else if(wp == SIZE_MAXIMIZED) 
                 windowStateChange(WEBVIEW_WINDOW_MAXIMIZE);
               break;
+            case WM_WINDOWPOSCHANGED: {
+              auto lpwp = (WINDOWPOS *)lp;
+              if (w != nullptr && !(lpwp->flags & SWP_NOSIZE)) {
+                if (w->m_borderless || w->m_transparent) {
+                  MARGINS margins = w->m_transparent ? MARGINS{ -1, -1, -1, -1 } : MARGINS{ 1, 1, 1, 1 };
+                  DwmExtendFrameIntoClientArea(hwnd, &margins);
+                }
+              }
+              return DefWindowProc(hwnd, msg, wp, lp);
+            }
             case WM_DPICHANGED: {
               auto prc = (RECT *)lp;
               SetWindowPos(hwnd, nullptr, prc->left, prc->top,
@@ -1370,6 +1386,24 @@ public:
               }
               break;
             // ---- /End Tray lib related --------
+            case WM_NCACTIVATE: {
+              if (w != nullptr && w->m_borderless) {
+                return DefWindowProc(hwnd, msg, wp, -1);
+              }
+              return DefWindowProc(hwnd, msg, wp, lp);
+            }
+            case WM_NCPAINT: {
+              if (w != nullptr && w->m_borderless) {
+                return 0;
+              }
+              return DefWindowProc(hwnd, msg, wp, lp);
+            }
+            case WM_ERASEBKGND: {
+              if (w != nullptr && (w->m_borderless || w->m_transparent)) {
+                return 1;
+              }
+              return DefWindowProc(hwnd, msg, wp, lp);
+            }
             case WM_NCCALCSIZE: {
               if (w != nullptr && w->m_borderless) {
                 if (IsZoomed(hwnd)) {
@@ -1441,9 +1475,13 @@ public:
       RegisterClassEx(&wc);
       int width = 640;
       int height = 480;
-      m_window = CreateWindow(L"Neutralinojs_webview", L"", WS_OVERLAPPEDWINDOW, 99999999,
-                              CW_USEDEFAULT, width, height, nullptr, nullptr,
-                              GetModuleHandle(nullptr), nullptr);
+      #ifndef WS_EX_NOREDIRECTIONBITMAP
+      #define WS_EX_NOREDIRECTIONBITMAP 0x00200000L
+      #endif
+      DWORD exStyle = WS_EX_NOREDIRECTIONBITMAP;
+      m_window = CreateWindowEx(exStyle, L"Neutralinojs_webview", L"", WS_OVERLAPPEDWINDOW, 99999999,
+                                CW_USEDEFAULT, width, height, nullptr, nullptr,
+                                GetModuleHandle(nullptr), nullptr);
       SetWindowLongPtr(m_window, GWLP_USERDATA, (LONG_PTR)this);
     } else {
       m_window = *(static_cast<HWND *>(window));

@@ -106,17 +106,25 @@ HRESULT TrySetWindowTheme(HWND hWnd) {
 #define DWMNCRP_DISABLED 1
 #endif
 
+#ifndef WS_EX_NOREDIRECTIONBITMAP
+#define WS_EX_NOREDIRECTIONBITMAP 0x00200000L
+#endif
+
 // Enables native Windows DWM Acrylic frosted backdrop blur or resets to 100% clear transparency.
 // When enable == true: applies DWM system backdrop Acrylic (DWMSBT_TRANSIENTWINDOW on Win11).
 // When enable == false: resets DWM backdrop to DWMSBT_NONE with extended frame for 100% clear transparency.
 // WS_EX_LAYERED is strictly stripped to guarantee 100% hit testing across the entire screen at any DPI scaling.
+// WS_EX_NOREDIRECTIONBITMAP is enforced to eliminate stale GDI redirection buffers on resize and blur.
 inline HRESULT TrySetWindowBackdrop(HWND hWnd, bool enable) {
     DWORD build = GetBuildNumber();
 
     // 1. Permanently strip WS_EX_LAYERED to eliminate 125% DPI hit-test dead zones
+    // and ensure WS_EX_NOREDIRECTIONBITMAP is present
     LONG exStyle = ::GetWindowLong(hWnd, GWL_EXSTYLE);
-    if (exStyle & WS_EX_LAYERED) {
-        ::SetWindowLong(hWnd, GWL_EXSTYLE, exStyle & ~WS_EX_LAYERED);
+    if ((exStyle & WS_EX_LAYERED) || !(exStyle & WS_EX_NOREDIRECTIONBITMAP)) {
+        exStyle &= ~WS_EX_LAYERED;
+        exStyle |= WS_EX_NOREDIRECTIONBITMAP;
+        ::SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
     }
 
     // 2. Permanently disable DWM non-client rendering of native caption buttons
