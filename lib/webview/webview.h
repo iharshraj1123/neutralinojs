@@ -1252,6 +1252,7 @@ private:
 class win32_edge_engine {
 public:
   win32_edge_engine(bool debug, bool openInspector, void *window, bool transparent, const std::string& args, bool emitDropEvents) {
+    m_transparent = transparent;
     setDpi();
     if(args != "") {
         std::wstring wargs = str2wstr(args);
@@ -1270,7 +1271,7 @@ public:
       wc.lpszClassName = L"Neutralinojs_webview";
       wc.hIcon = icon;
       wc.hIconSm = icon;
-      wc.hbrBackground = CreateSolidBrush(RGB(24, 24, 24));
+      wc.hbrBackground = transparent ? (HBRUSH)GetStockObject(BLACK_BRUSH) : CreateSolidBrush(RGB(24, 24, 24));
       wc.lpfnWndProc =
           (WNDPROC)(+[](HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) -> int {
             auto w = (win32_edge_engine *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
@@ -1438,8 +1439,8 @@ public:
             return 0;
           });
       RegisterClassEx(&wc);
-      int width = transparent ? 8000 : 640;
-      int height = transparent ? 8000 : 480;
+      int width = 640;
+      int height = 480;
       m_window = CreateWindow(L"Neutralinojs_webview", L"", WS_OVERLAPPEDWINDOW, 99999999,
                               CW_USEDEFAULT, width, height, nullptr, nullptr,
                               GetModuleHandle(nullptr), nullptr);
@@ -1449,7 +1450,6 @@ public:
     }
 
     if (transparent) {
-      SetWindowLong(m_window, GWL_EXSTYLE, GetWindowLong(m_window, GWL_EXSTYLE) | WS_EX_LAYERED);
       // transparent white, use of environment variable prevents flashing on show
       SetEnvironmentVariable(L"WEBVIEW2_DEFAULT_BACKGROUND_COLOR", L"00FFFFFF");
     } else {
@@ -1585,6 +1585,7 @@ public:
   void extend_user_agent(const std::string customAgent) { m_browser->extend_user_agent(customAgent); }
 
   bool m_borderless = false;
+  bool m_transparent = false;
 
   void setBorderless(bool borderless) {
     m_borderless = borderless;
@@ -1597,7 +1598,7 @@ public:
       int ncrp = 1; // DWMNCRP_DISABLED: disables native DWM caption button rendering
       DwmSetWindowAttribute(m_window, 2, &ncrp, sizeof(ncrp));
 
-      MARGINS margins = { 1, 1, 1, 1 };
+      MARGINS margins = m_transparent ? MARGINS{ -1, -1, -1, -1 } : MARGINS{ 1, 1, 1, 1 };
       DwmExtendFrameIntoClientArea(m_window, &margins);
     } else {
       currentStyle |= (WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);

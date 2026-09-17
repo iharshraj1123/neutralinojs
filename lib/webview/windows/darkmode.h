@@ -107,138 +107,35 @@ HRESULT TrySetWindowTheme(HWND hWnd) {
 #endif
 
 // Enables native Windows DWM Acrylic frosted backdrop blur or resets to 100% clear transparency.
-// When enable == true: applies DWM system backdrop Acrylic (DWMSBT_TRANSIENTWINDOW on Win11 / ACCENT_ENABLE_ACRYLICBLURBEHIND on Win10).
-// When enable == false: resets DWM backdrop to DWMSBT_NONE, resets frame margins to {1, 1, 1, 1}, restores WS_EX_LAYERED, and applies ACCENT_ENABLE_TRANSPARENTGRADIENT for 100% clear transparency.
+// When enable == true: applies DWM system backdrop Acrylic (DWMSBT_TRANSIENTWINDOW on Win11).
+// When enable == false: resets DWM backdrop to DWMSBT_NONE with extended frame for 100% clear transparency.
+// WS_EX_LAYERED is strictly stripped to guarantee 100% hit testing across the entire screen at any DPI scaling.
 inline HRESULT TrySetWindowBackdrop(HWND hWnd, bool enable) {
     DWORD build = GetBuildNumber();
 
-    // 1. Permanently disable DWM non-client rendering of native caption buttons
+    // 1. Permanently strip WS_EX_LAYERED to eliminate 125% DPI hit-test dead zones
+    LONG exStyle = ::GetWindowLong(hWnd, GWL_EXSTYLE);
+    if (exStyle & WS_EX_LAYERED) {
+        ::SetWindowLong(hWnd, GWL_EXSTYLE, exStyle & ~WS_EX_LAYERED);
+    }
+
+    // 2. Permanently disable DWM non-client rendering of native caption buttons
     int ncrp = DWMNCRP_DISABLED;
     DwmSetWindowAttribute(hWnd, DWMWA_NCRENDERING_POLICY, &ncrp, sizeof(ncrp));
 
-    // 2. Strip WS_SYSMENU, WS_MINIMIZEBOX, WS_MAXIMIZEBOX so DWM never draws native caption buttons
+    // 3. Strip WS_SYSMENU, WS_MINIMIZEBOX, WS_MAXIMIZEBOX so DWM never draws native caption buttons
     DWORD currentStyle = ::GetWindowLong(hWnd, GWL_STYLE);
     if (currentStyle & WS_SYSMENU) {
         currentStyle &= ~(WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
         ::SetWindowLong(hWnd, GWL_STYLE, currentStyle);
     }
 
-    if (enable) {
-        // --- ACRYLIC FROSTED BLUR (blur > 0) ---
-        if (build >= 22621) {
-            // Remove WS_EX_LAYERED so DWM system backdrop can take effect on Win11 22H2+
-            LONG exStyle = ::GetWindowLong(hWnd, GWL_EXSTYLE);
-            ::SetWindowLong(hWnd, GWL_EXSTYLE, exStyle & ~WS_EX_LAYERED);
+    if (build >= 22621) {
+        MARGINS margins = {-1, -1, -1, -1};
+        DwmExtendFrameIntoClientArea(hWnd, &margins);
 
-            MARGINS margins = {-1, -1, -1, -1};
-            DwmExtendFrameIntoClientArea(hWnd, &margins);
-
-            int backdropType = DWMSBT_TRANSIENTWINDOW; // 3 = Acrylic
-            DwmSetWindowAttribute(hWnd, DWMWA_SYSTEMBACKDROP_TYPE, &backdropType, sizeof(backdropType));
-        }
-
-        // Apply SetWindowCompositionAttribute Acrylic for Windows 10 and fallback
-        HMODULE hUser32 = ::GetModuleHandleA("user32.dll");
-        if (hUser32) {
-            typedef enum _ACCENT_STATE {
-                ACCENT_DISABLED = 0,
-                ACCENT_ENABLE_GRADIENT = 1,
-                ACCENT_ENABLE_TRANSPARENTGRADIENT = 2,
-                ACCENT_ENABLE_BLURBEHIND = 3,
-                ACCENT_ENABLE_ACRYLICBLURBEHIND = 4,
-                ACCENT_ENABLE_HOSTBACKDROP = 5
-            } ACCENT_STATE;
-
-            typedef struct _ACCENT_POLICY {
-                ACCENT_STATE AccentState;
-                int AccentFlags;
-                int GradientColor;
-                int AnimationId;
-            } ACCENT_POLICY;
-
-            typedef struct _WINDOWCOMPOSITIONATTRIBDATA {
-                int Attribute;
-                void* Data;
-                int SizeOfData;
-            } WINDOWCOMPOSITIONATTRIBDATA;
-
-            typedef BOOL (WINAPI *pfnSetWindowCompositionAttribute)(HWND, WINDOWCOMPOSITIONATTRIBDATA*);
-            pfnSetWindowCompositionAttribute pSet = 
-                (pfnSetWindowCompositionAttribute)::GetProcAddress(hUser32, "SetWindowCompositionAttribute");
-
-            if (pSet) {
-                ACCENT_POLICY policy;
-                policy.AccentState = ACCENT_ENABLE_ACRYLICBLURBEHIND;
-                policy.AccentFlags = 2; // draw all borders
-                policy.GradientColor = 0x01181818; // subtle dark tint
-                policy.AnimationId = 0;
-
-                WINDOWCOMPOSITIONATTRIBDATA data;
-                data.Attribute = 19; // WCA_ACCENT_POLICY
-                data.Data = &policy;
-                data.SizeOfData = sizeof(policy);
-                pSet(hWnd, &data);
-            }
-        }
-    } else {
-        // --- 100% CRYSTAL-CLEAR TRANSPARENCY (blur == 0) ---
-        if (build >= 22621) {
-            // Reset DWM system backdrop to NONE
-            int backdropType = DWMSBT_NONE;
-            DwmSetWindowAttribute(hWnd, DWMWA_SYSTEMBACKDROP_TYPE, &backdropType, sizeof(backdropType));
-
-            // Reset extended frame margins so DWM stops drawing the solid non-client frame inside client area
-            MARGINS margins = {1, 1, 1, 1};
-            DwmExtendFrameIntoClientArea(hWnd, &margins);
-        }
-
-        // Restore WS_EX_LAYERED so WebView2 DirectComposition renders transparently to desktop
-        LONG exStyle = ::GetWindowLong(hWnd, GWL_EXSTYLE);
-        ::SetWindowLong(hWnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
-
-        // Apply SetWindowCompositionAttribute ACCENT_ENABLE_TRANSPARENTGRADIENT for pure transparency
-        HMODULE hUser32 = ::GetModuleHandleA("user32.dll");
-        if (hUser32) {
-            typedef enum _ACCENT_STATE {
-                ACCENT_DISABLED = 0,
-                ACCENT_ENABLE_GRADIENT = 1,
-                ACCENT_ENABLE_TRANSPARENTGRADIENT = 2,
-                ACCENT_ENABLE_BLURBEHIND = 3,
-                ACCENT_ENABLE_ACRYLICBLURBEHIND = 4,
-                ACCENT_ENABLE_HOSTBACKDROP = 5
-            } ACCENT_STATE;
-
-            typedef struct _ACCENT_POLICY {
-                ACCENT_STATE AccentState;
-                int AccentFlags;
-                int GradientColor;
-                int AnimationId;
-            } ACCENT_POLICY;
-
-            typedef struct _WINDOWCOMPOSITIONATTRIBDATA {
-                int Attribute;
-                void* Data;
-                int SizeOfData;
-            } WINDOWCOMPOSITIONATTRIBDATA;
-
-            typedef BOOL (WINAPI *pfnSetWindowCompositionAttribute)(HWND, WINDOWCOMPOSITIONATTRIBDATA*);
-            pfnSetWindowCompositionAttribute pSet = 
-                (pfnSetWindowCompositionAttribute)::GetProcAddress(hUser32, "SetWindowCompositionAttribute");
-
-            if (pSet) {
-                ACCENT_POLICY policy;
-                policy.AccentState = ACCENT_ENABLE_TRANSPARENTGRADIENT;
-                policy.AccentFlags = 2; // draw all borders
-                policy.GradientColor = 0x00000000;
-                policy.AnimationId = 0;
-
-                WINDOWCOMPOSITIONATTRIBDATA data;
-                data.Attribute = 19; // WCA_ACCENT_POLICY
-                data.Data = &policy;
-                data.SizeOfData = sizeof(policy);
-                pSet(hWnd, &data);
-            }
-        }
+        int backdropType = enable ? DWMSBT_TRANSIENTWINDOW : DWMSBT_NONE;
+        DwmSetWindowAttribute(hWnd, DWMWA_SYSTEMBACKDROP_TYPE, &backdropType, sizeof(backdropType));
     }
 
     // Flush frame and trigger redraw
