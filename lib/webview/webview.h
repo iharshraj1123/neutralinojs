@@ -1265,12 +1265,6 @@ public:
             switch (msg) {
             case WM_SIZE:
               w->m_browser->resize(hwnd);
-              if (GetWindowLong(hwnd, GWL_EXSTYLE) & WS_EX_LAYERED) {
-                RECT rect;
-                GetClientRect(hwnd, &rect);
-                HRGN region = CreateRectRgn(0, 0, rect.right, rect.bottom);
-                SetWindowRgn(hwnd, region, TRUE);
-              }
               if(!windowStateChange) break;
               if(wp == SIZE_MINIMIZED) 
                 windowStateChange(WEBVIEW_WINDOW_MINIMIZED);
@@ -1415,10 +1409,6 @@ public:
       SetWindowLong(m_window, GWL_EXSTYLE, GetWindowLong(m_window, GWL_EXSTYLE) | WS_EX_LAYERED);
       // transparent white, use of environment variable prevents flashing on show
       SetEnvironmentVariable(L"WEBVIEW2_DEFAULT_BACKGROUND_COLOR", L"00FFFFFF");
-      RECT rect;
-      GetClientRect(m_window, &rect);
-      HRGN region = CreateRectRgn(0, 0, rect.right, rect.bottom);
-      SetWindowRgn(m_window, region, TRUE);
     } else {
       // dark background prevents white flash on show
       SetEnvironmentVariable(L"WEBVIEW2_DEFAULT_BACKGROUND_COLOR", L"FF181818");
