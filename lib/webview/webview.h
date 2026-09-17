@@ -1371,9 +1371,22 @@ public:
             // ---- /End Tray lib related --------
             case WM_NCCALCSIZE: {
               if (w != nullptr && w->m_borderless) {
-                if (wp == TRUE) {
-                  return 0;
+                if (IsZoomed(hwnd)) {
+                  HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+                  if (monitor != nullptr) {
+                    MONITORINFO mi = { sizeof(MONITORINFO) };
+                    if (GetMonitorInfo(monitor, &mi)) {
+                      if (wp == TRUE) {
+                        auto params = (NCCALCSIZE_PARAMS *)lp;
+                        params->rgrc[0] = mi.rcWork;
+                      } else {
+                        auto rc = (RECT *)lp;
+                        *rc = mi.rcWork;
+                      }
+                    }
+                  }
                 }
+                return 0;
               }
               return DefWindowProc(hwnd, msg, wp, lp);
             }
